@@ -2,33 +2,45 @@
 
 [![CI](https://github.com/sjqtentacles/sml-mp4/actions/workflows/ci.yml/badge.svg)](https://github.com/sjqtentacles/sml-mp4/actions/workflows/ci.yml)
 
-ISO Base Media File Format (MP4 / `.mov`) **box** scanning for Standard ML.
-Reads the top-level box list — each box's 4-character type and 32-bit size —
-from a byte vector.
+ISO Base Media File Format (MP4 / `.mov`) **box tree** parsing for Standard ML.
+Reads the box list — each box's 4-character type and size — from a byte vector,
+recursing into known container boxes and decoding 64-bit large sizes.
 
 ## API
 
 ```sml
 datatype box = Box of { kind : string, size : int, children : box list }
 
-Mp4.parse bytes   (* -> box list (top level) *)
+val parse       : Word8Vector.vector -> box list   (* recursive box tree *)
+val isContainer : string -> bool
+val findAll     : string -> box list -> box list    (* depth-first, pre-order *)
 ```
 
 ```sml
 val boxes = Mp4.parse data
 List.map (fn Mp4.Box b => #kind b) boxes   (* e.g. ["ftyp", "moov", "mdat"] *)
+
+(* Container boxes are descended into; leaves have children = [] *)
+Mp4.isContainer "moov"    (* true  *)
+Mp4.isContainer "mvhd"    (* false *)
+
+(* Find every box of a kind anywhere in the tree *)
+Mp4.findAll "trak" (Mp4.parse data)   (* all track boxes, however deeply nested *)
 ```
+
+Recognized container boxes (descended into): `moov`, `trak`, `mdia`, `minf`,
+`stbl`, `udta`, `dinf`, `edts`, `mvex`, `moof`, `traf`.
 
 ## Scope and limitations
 
-- **Top-level boxes only — this is a flat scanner, not a tree parser.** The
-  `children` field is always `[]`; container boxes (`moov`, `trak`, …) are
-  reported as single boxes and are not recursed into.
-- Reads 32-bit (`size`) box sizes. The 64-bit large-size form (`size == 1` with
-  an 8-byte extended size) and `size == 0` (box-to-end-of-file) are not
-  specially handled.
+- Decodes the box framing layer: 32-bit `size`, the 64-bit large-size form
+  (`size == 1` with an 8-byte extended size), `size == 0` (box-to-end-of-file),
+  and recursion into the known container boxes above. Unknown boxes are treated
+  as leaves.
 - Box payloads are not interpreted — no `ftyp` brands, sample tables, codec
-  configuration, etc.
+  configuration, full-box version/flags, or `uuid` extended types.
+- 64-bit sizes are read into the platform `int`; extremely large files may
+  exceed a narrow `int` range.
 
 ## Installing with smlpkg
 
@@ -59,10 +71,10 @@ sml.pkg
 Makefile
 lib/github.com/sjqtentacles/sml-mp4/
   mp4.sig
-  mp4.sml      top-level box (size + 4cc) scanner
+  mp4.sml      recursive box-tree parser (containers + 64-bit largesize)
   mp4.mlb
 test/
-  test.sml     single box, multiple boxes with sizes, truncated input
+  test.sml     flat boxes, recursion, nesting, largesize, findAll
 ```
 
 ## License
