@@ -73,6 +73,31 @@ Recognized container boxes (descended into): `moov`, `trak`, `mdia`, `minf`,
 - 64-bit sizes/durations are read into the platform `int`; extremely large
   files may exceed a narrow `int` range.
 
+## Example
+
+`make example` builds and runs [`examples/demo.sml`](examples/demo.sml), which
+hand-builds a minimal in-memory `ftyp` + `moov`/`mvhd` box buffer, `parse`s
+it, walks the box tree with `find`/`path`, and reads `ftyp` brands, `mvhd`
+timescale/duration, and `movieDuration` (output is byte-identical under
+MLton and Poly/ML):
+
+```
+ISO BMFF box tree:
+ftyp (size=28, off=0)
+moov (size=36, off=28)
+  mvhd (size=28, off=36)
+
+ftyp fields:
+  payloadLength = 20
+  major=isom minor=512 compatible=[isom,iso2,mp41]
+
+moov/mvhd fields:
+  timescale=1000 duration=5000
+
+movieDuration (seconds):
+  5.000
+```
+
 ## Installing with smlpkg
 
 ```sh
